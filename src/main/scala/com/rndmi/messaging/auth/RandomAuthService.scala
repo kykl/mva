@@ -3,13 +3,12 @@ package com.rndmi.messaging.auth
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.stream.ActorMaterializer
 import io.bigfast.messaging.MessagingServer._
 import io.bigfast.messaging.auth.AuthService
 import io.grpc.Metadata
-import spray.json.{DefaultJsonProtocol, JsObject, JsonParser, ParserInput}
+import spray.json.{DefaultJsonProtocol, JsonParser, ParserInput}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -56,7 +55,7 @@ class RandomAuthService extends AuthService {
   }
 }
 
-object RandomAuthService extends JsonSupport{
+object RandomAuthService extends JsonSupport {
   val authorizationKey = Metadata.Key.of("AUTHORIZATION", Metadata.ASCII_STRING_MARSHALLER)
   val sessionKey = Metadata.Key.of("X-AUTHENTICATION", Metadata.ASCII_STRING_MARSHALLER)
   val http = Http()
@@ -71,6 +70,7 @@ object RandomAuthService extends JsonSupport{
 }
 
 final case class RandomData(userId: Long)
+
 final case class RandomResponse(code: Long, data: RandomData)
 
 trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
