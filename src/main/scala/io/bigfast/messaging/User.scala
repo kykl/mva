@@ -27,6 +27,6 @@ class User(name: String, mediator: ActorRef, streamObserver: StreamObserver[Mess
     case subscriptionRemove: Channel.Subscription.Remove =>
       mediator ! Unsubscribe(subscriptionRemove.channelId, self)
     case subscriptionAdded: SubscribeAck =>
-    // TODO: create a stream for listening to subscribe/unsubscribe events?
+      println(s"Successfully subscribed $name to ${subscriptionAdded.subscribe.topic}")
   }
 }
