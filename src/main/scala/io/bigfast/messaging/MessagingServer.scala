@@ -95,7 +95,7 @@ class MessagingServer {
 
     override def channelMessageStream(responseObserver: StreamObserver[Message]): StreamObserver[Message] = {
       val userId: String = HeaderServerInterceptor.userIdKey.get()
-      println(s"Got userId: $userId")
+      println(s"Creating stream for userId: $userId")
       system.actorOf(User.props(userId, mediator, responseObserver))
 
       new StreamObserver[Channel.Message] {
@@ -114,41 +114,48 @@ class MessagingServer {
     }
 
     override def createChannel(request: Empty): Future[Channel] =
-      if (HeaderServerInterceptor.privilegedKey.get()) {
-        Future {
-          val channelId = UUID.randomUUID().toString
-          val channel = Channel(channelId)
-          println(s"Create channel ${channel.id}")
-          channel
-        }
-      } else {
-        Future.failed(new Throwable("Not privileged"))
+      eventualPrivilegeCheck(request) { request =>
+        val channelId = UUID.randomUUID().toString
+        val channel = Channel(channelId)
+        println(s"Create channel ${channel.id}")
+        channel
       }
 
+    override def channelHistory(request: Get): Future[Channel] =
+      eventualPrivilegeCheck(request) { request =>
+        println(s"Return channel history for channel ${request.channelId}")
+        val msg = MessagingClient.encodeJsonAsByteString("{text: 'ping'}")
+        val messages = Seq(
+          Message(id = "1", channelId = request.channelId, userId = MessagingClient.userId, content = msg),
+          Message(id = "2", channelId = request.channelId, userId = MessagingClient.userId, content = msg)
+        )
+        Channel(request.channelId, messages)
+      }
 
-    override def channelHistory(request: Get): Future[Channel] = Future {
-      println(s"Return channel history for channel ${request.channelId}")
-      val msg = MessagingClient.encodeJsonAsByteString("{text: 'ping'}")
-      val messages = Seq(
-        Message(id = "1", channelId = request.channelId, userId = MessagingClient.userId, content = msg),
-        Message(id = "2", channelId = request.channelId, userId = MessagingClient.userId, content = msg)
-      )
-      Channel(request.channelId, messages)
-    }
+    override def subscribeChannel(request: Add): Future[Empty] =
+      eventualPrivilegeCheck(request) { request =>
+        println(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
+        val adminTopic = User.adminTopic(request.userId.toString)
+        mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
+        Empty.defaultInstance
+      }
 
-    override def subscribeChannel(request: Add): Future[Empty] = Future {
-      println(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
-      val adminTopic = User.adminTopic(request.userId.toString)
-      mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
-      Empty.defaultInstance
-    }
+    override def unsubscribeChannel(request: Remove): Future[Empty] =
+      eventualPrivilegeCheck(request) { request =>
+        println(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
+        val adminTopic = User.adminTopic(request.userId.toString)
+        mediator ! Publish(adminTopic, Remove(request.channelId, request.userId))
+        Empty.defaultInstance
+      }
 
-    override def unsubscribeChannel(request: Remove): Future[Empty] = Future {
-      println(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
-      val adminTopic = User.adminTopic(request.userId.toString)
-      mediator ! Publish(adminTopic, Remove(request.channelId, request.userId))
-      Empty.defaultInstance
+    private def eventualPrivilegeCheck[A, B](request: A)(process: A => B) = {
+      if (HeaderServerInterceptor.privilegedKey.get()) {
+        Future {
+          process(request)
+        }
+      } else {
+        Future.failed(new Exception("Not Privileged"))
+      }
     }
   }
-
 }
