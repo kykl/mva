@@ -1,14 +1,13 @@
 package com.rndmi.messaging.auth
 
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.stream.ActorMaterializer
 import io.bigfast.messaging.MessagingServer._
 import io.bigfast.messaging.auth.AuthService
 import io.grpc.Metadata
-import spray.json.{DefaultJsonProtocol, JsonParser, ParserInput}
+import spray.json.{JsonParser, ParserInput}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -21,13 +20,10 @@ class RandomAuthService extends AuthService {
 
   import RandomAuthService._
 
-  implicit val rdf = randomDataFormat
-  implicit val rrf = randomResponseFormat
-
   override def doAuth(metadata: Metadata) = Try {
 
-    val authorization = metadata.get[String](RandomAuthService.authorizationKey)
-    val session = metadata.get[String](RandomAuthService.sessionKey)
+    val authorization = metadata.get[String](authorizationKey)
+    val session = metadata.get[String](sessionKey)
 
     println(s"Checking auth for $authorization, $session")
 
@@ -44,7 +40,6 @@ class RandomAuthService extends AuthService {
 
       println(s"Parsed this response: $eventualRandomResponse")
       eventualRandomResponse
-
     }
 
     val awaitedResponse = Await.result(request, 5.seconds)
@@ -61,19 +56,9 @@ object RandomAuthService extends JsonSupport {
   val http = Http()
   implicit val materializer = ActorMaterializer()
 
-  implicit val unmarshaller: Unmarshaller[HttpEntity, RandomResponse] = {
-    Unmarshaller.byteArrayUnmarshaller.mapWithCharset { (data, charset) =>
+  val unmarshaller: Unmarshaller[HttpEntity, RandomResponse] = {
+    Unmarshaller.byteArrayUnmarshaller mapWithCharset { (data, charset) =>
       JsonParser(ParserInput(data)).asJsObject.convertTo[RandomResponse]
     }
   }
-
-}
-
-final case class RandomData(userId: Long)
-
-final case class RandomResponse(code: Long, data: RandomData)
-
-trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val randomDataFormat = jsonFormat1(RandomData)
-  implicit val randomResponseFormat = jsonFormat2(RandomResponse)
 }
