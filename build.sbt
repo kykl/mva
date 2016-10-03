@@ -3,7 +3,7 @@ import com.typesafe.sbt.packager.docker._
 lazy val root = (project in file(".")).
   settings(
     name := "messaging-cluster",
-    version := "0.10",
+    version := "0.11",
     scalaVersion := "2.11.8"
   ).
   enablePlugins(JavaAppPackaging)
