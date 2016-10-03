@@ -54,8 +54,8 @@ class MessagingServer {
   private[this] var server: Server = _
 
   private def start(): Unit = {
-    val certFile = new File("cert-chain.crt")
-    val privateKey = new File("private-key.pem")
+    val certFile = new File("/etc/secrets/cert-chain")
+    val privateKey = new File("/etc/secrets/private-key")
     server = ServerBuilder
       .forPort(MessagingServer.port)
       .useTransportSecurity(certFile, privateKey)
