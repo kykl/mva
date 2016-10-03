@@ -132,10 +132,6 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
 
     requestObserver.onCompleted()
 
-    println(s"Testing blocking calls")
-    val channel = blockingStub.channelHistory(Channel.Get(chatChannel.id))
-    println(s"Got channel $channel")
-
     r
   }
 
