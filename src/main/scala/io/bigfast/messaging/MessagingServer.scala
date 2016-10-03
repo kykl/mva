@@ -8,10 +8,9 @@ import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Publish
-import com.rndmi.messaging.MessagingClient
 import com.typesafe.config.ConfigFactory
+import io.bigfast.messaging.Channel.Message
 import io.bigfast.messaging.Channel.Subscription.{Add, Remove}
-import io.bigfast.messaging.Channel.{Get, Message}
 import io.bigfast.messaging.auth.{AuthService, HeaderServerInterceptor}
 import io.grpc._
 import io.grpc.stub.StreamObserver
@@ -121,30 +120,11 @@ class MessagingServer {
         channel
       }
 
-    override def channelHistory(request: Get): Future[Channel] =
-      eventualPrivilegeCheck(request) { request =>
-        println(s"Return channel history for channel ${request.channelId}")
-        val msg = MessagingClient.encodeJsonAsByteString("{text: 'ping'}")
-        val messages = Seq(
-          Message(id = "1", channelId = request.channelId, userId = MessagingClient.userId, content = msg),
-          Message(id = "2", channelId = request.channelId, userId = MessagingClient.userId, content = msg)
-        )
-        Channel(request.channelId, messages)
-      }
-
     override def subscribeChannel(request: Add): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
         println(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
         val adminTopic = User.adminTopic(request.userId.toString)
         mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
-        Empty.defaultInstance
-      }
-
-    override def unsubscribeChannel(request: Remove): Future[Empty] =
-      eventualPrivilegeCheck(request) { request =>
-        println(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
-        val adminTopic = User.adminTopic(request.userId.toString)
-        mediator ! Publish(adminTopic, Remove(request.channelId, request.userId))
         Empty.defaultInstance
       }
 
@@ -157,5 +137,14 @@ class MessagingServer {
         Future.failed(new Exception("Not Privileged"))
       }
     }
+
+    override def unsubscribeChannel(request: Remove): Future[Empty] =
+      eventualPrivilegeCheck(request) { request =>
+        println(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
+        val adminTopic = User.adminTopic(request.userId.toString)
+        mediator ! Publish(adminTopic, Remove(request.channelId, request.userId))
+        Empty.defaultInstance
+      }
   }
+
 }

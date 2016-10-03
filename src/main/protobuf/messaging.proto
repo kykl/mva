@@ -12,12 +12,6 @@ message Channel {
         bytes content = 4;
     }
 
-    message Get {
-        string channelId = 1;
-        uint32 beforeTs = 2;
-        uint32 batchSize = 3;
-    }
-
     message Subscription {
         message Add {
             string channelId = 1;
@@ -38,7 +32,6 @@ message Channel {
 service Messaging {
     rpc ChannelMessageStream(stream Channel.Message) returns (stream Channel.Message) {}
     rpc CreateChannel(Empty) returns (Channel) {}
-    rpc ChannelHistory(Channel.Get) returns (Channel) {}
 
     rpc SubscribeChannel(Channel.Subscription.Add) returns (Empty) {}
     rpc UnsubscribeChannel(Channel.Subscription.Remove) returns (Empty) {}

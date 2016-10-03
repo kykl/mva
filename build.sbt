@@ -1,8 +1,19 @@
-name := """messaging-cluster"""
+import com.typesafe.sbt.packager.docker._
 
-version := "0.1"
+lazy val root = (project in file(".")).
+  settings(
+    name := "messaging-cluster",
+    version := "0.10",
+    scalaVersion := "2.11.8"
+  ).
+  enablePlugins(JavaAppPackaging)
 
-scalaVersion := "2.11.8"
+packageName in Docker := "gcr.io/deductive_tree_102115/messaging-cluster"
+dockerBaseImage := "develar/java:8u45"
+dockerCommands := dockerCommands.value flatMap {
+  case cmd@Cmd("FROM", _) => List(cmd, Cmd("RUN", "apk update && apk add bash"))
+  case other              => List(other)
+}
 
 lazy val akkaVersion = "2.4.10"
 
