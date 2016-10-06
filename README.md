@@ -9,6 +9,19 @@
 5. Connect using a client (like `ChatterBox`) and use a hostname that matches the certificate
 6. Use something like Route53 DNS to point to the server.
 
+## Proto files
+
+The folder containing `.proto` files is a `git subtree` of a separate repo (here `ZhangBanger/proto`). The simplest thing to do is to commit updates upstream and pull them down. You need to set up the repo and then fetch it.
+
+### Set up subtree
+
+`git subtree add --prefix=src/main/protobuf git@github.com:ZhangBanger/proto.git master`
+
+### Fetch update
+ 
+`git subtree pull --prefix=src/main/protobuf git@github.com:ZhangBanger/proto.git master`
+
+
 # Troubleshooting
 
 ### IntelliJ IDEA Issue - Object/Class Already Defined Error
