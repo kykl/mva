@@ -21,12 +21,13 @@ class User(name: String, mediator: ActorRef, streamObserver: StreamObserver[Mess
 
   def receive = {
     case message: Message =>
+      log.info(message.toString)
       streamObserver.onNext(message)
     case subscriptionAdd: Channel.Subscription.Add =>
       mediator ! Subscribe(subscriptionAdd.channelId, self)
     case subscriptionRemove: Channel.Subscription.Remove =>
       mediator ! Unsubscribe(subscriptionRemove.channelId, self)
     case subscriptionAdded: SubscribeAck =>
-      println(s"Successfully subscribed $name to ${subscriptionAdded.subscribe.topic}")
+      log.info(s"Successfully subscribed $name to ${subscriptionAdded.subscribe.topic}")
   }
 }
