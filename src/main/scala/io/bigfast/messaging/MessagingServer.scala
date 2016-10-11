@@ -1,8 +1,8 @@
 package io.bigfast.messaging
 
 import java.io.File
+import java.util.UUID
 import java.util.logging.Logger
-import java.util.{Base64, UUID}
 
 import akka.actor.ActorSystem
 import akka.cluster.Cluster
@@ -68,12 +68,12 @@ class MessagingServer {
       .build
       .start
 
-    MessagingServer.logger.info("Server started, listening on " + MessagingServer.port)
+    logger.info("Server started, listening on " + MessagingServer.port)
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run(): Unit = {
-        System.err.println("*** shutting down gRPC server since JVM is shutting down")
+        logger.info("*** shutting down gRPC server since JVM is shutting down")
         self.stop()
-        System.err.println("*** server shut down")
+        logger.info("*** server shut down")
       }
     })
   }
@@ -94,16 +94,16 @@ class MessagingServer {
 
     override def channelMessageStream(responseObserver: StreamObserver[Message]): StreamObserver[Message] = {
       val userId: String = HeaderServerInterceptor.userIdKey.get()
-      println(s"Creating stream for userId: $userId")
+      logger.info(s"Creating stream for userId: $userId")
       system.actorOf(User.props(userId, mediator, responseObserver))
 
       new StreamObserver[Channel.Message] {
-        override def onError(t: Throwable): Unit = println(t)
+        override def onError(t: Throwable): Unit = logger.warning(t.getMessage)
 
         override def onCompleted(): Unit = responseObserver.onCompleted()
 
         override def onNext(message: Message): Unit = {
-          println(s"Server Got Message on channel ${message.channelId} for user ${message.userId} with content: ${message.content.toStringUtf8}")
+          logger.info(s"Server Got Message on channel ${message.channelId} for user ${message.userId} with content: ${message.content.toStringUtf8}")
           mediator ! Publish(message.channelId.toString, message)
         }
       }
@@ -113,16 +113,8 @@ class MessagingServer {
       eventualPrivilegeCheck(request) { request =>
         val channelId = UUID.randomUUID().toString
         val channel = Channel(channelId)
-        println(s"Create channel ${channel.id}")
+        logger.info(s"Create channel ${channel.id}")
         channel
-      }
-
-    override def subscribeChannel(request: Add): Future[Empty] =
-      eventualPrivilegeCheck(request) { request =>
-        println(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
-        val adminTopic = User.adminTopic(request.userId.toString)
-        mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
-        Empty.defaultInstance
       }
 
     private def eventualPrivilegeCheck[A, B](request: A)(process: A => B) = {
@@ -135,9 +127,17 @@ class MessagingServer {
       }
     }
 
+    override def subscribeChannel(request: Add): Future[Empty] =
+      eventualPrivilegeCheck(request) { request =>
+        logger.info(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
+        val adminTopic = User.adminTopic(request.userId.toString)
+        mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
+        Empty.defaultInstance
+      }
+
     override def unsubscribeChannel(request: Remove): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
-        println(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
+        logger.info(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
         val adminTopic = User.adminTopic(request.userId.toString)
         mediator ! Publish(adminTopic, Remove(request.channelId, request.userId))
         Empty.defaultInstance
