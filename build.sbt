@@ -3,7 +3,7 @@ import com.typesafe.sbt.packager.docker._
 lazy val root = (project in file(".")).
   settings(
     name := "messaging-cluster",
-    version := "0.13",
+    version := "0.14",
     mainClass in Compile := Some("io.bigfast.messaging.MessagingServer"),
     scalaVersion := "2.11.8"
   ).
