@@ -26,7 +26,7 @@ import scala.util.{Failure, Random, Success, Try}
 
 object MessagingClient {
   // Hardcoded from rndmi internal auth
-  val userId = "18125"
+  val userId = "18127"
   val decoder = Base64.getDecoder
   val encoder = Base64.getEncoder
 

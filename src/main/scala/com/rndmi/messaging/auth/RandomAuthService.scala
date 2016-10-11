@@ -29,7 +29,7 @@ class RandomAuthService extends AuthService {
 
     val request = http.singleRequest(
       HttpRequest(
-        uri = "https://dev-api.rndmi.com:443/v1/profiles/me?fields=null"
+        uri = "https://dev-api.rndmi.com:443/v1/profiles/me?fields=userId"
       ).withHeaders(
         AuthorizationHeader(authorization),
         SessionHeader(session)

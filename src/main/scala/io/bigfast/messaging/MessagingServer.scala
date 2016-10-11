@@ -103,10 +103,7 @@ class MessagingServer {
         override def onCompleted(): Unit = responseObserver.onCompleted()
 
         override def onNext(message: Message): Unit = {
-          val messageByteString = message.content.toByteArray
-          val dec = Base64.getDecoder
-          val b64String = new String(dec.decode(messageByteString))
-          println(s"Server Got Message: $b64String")
+          println(s"Server Got Message on channel ${message.channelId} for user ${message.userId} with content: ${message.content.toStringUtf8}")
           mediator ! Publish(message.channelId.toString, message)
         }
       }
