@@ -1,5 +1,7 @@
 package com.rndmi.messaging.auth
 
+import java.util.logging.Logger
+
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
@@ -25,7 +27,7 @@ class RandomAuthService extends AuthService {
     val authorization = metadata.get[String](authorizationKey)
     val session = metadata.get[String](sessionKey)
 
-    println(s"Checking auth for $authorization, $session")
+    logger.info(s"Checking auth for $authorization, $session")
 
     val request = http.singleRequest(
       HttpRequest(
@@ -38,13 +40,13 @@ class RandomAuthService extends AuthService {
       val responseEntity = response.entity
       val eventualRandomResponse = unmarshaller.apply(responseEntity)
 
-      println(s"Parsed this response: $eventualRandomResponse")
+      logger.info(s"Parsed this response: $eventualRandomResponse")
       eventualRandomResponse
     }
 
     val awaitedResponse = Await.result(request, 5.seconds)
 
-    println(s"Awaited and got $awaitedResponse")
+    logger.info(s"Awaited and got $awaitedResponse")
 
     (awaitedResponse.data.userId.toString, true)
   }
@@ -55,6 +57,8 @@ object RandomAuthService extends JsonSupport {
   val sessionKey = Metadata.Key.of("X-AUTHENTICATION", Metadata.ASCII_STRING_MARSHALLER)
   val http = Http()
   implicit val materializer = ActorMaterializer()
+
+  val logger = Logger.getLogger(this.getClass.getName)
 
   val unmarshaller: Unmarshaller[HttpEntity, RandomResponse] = {
     Unmarshaller.byteArrayUnmarshaller mapWithCharset { (data, charset) =>
