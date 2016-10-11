@@ -27,8 +27,6 @@ import scala.util.{Failure, Random, Success, Try}
 object MessagingClient {
   // Hardcoded from rndmi internal auth
   val userId = "18127"
-  val decoder = Base64.getDecoder
-  val encoder = Base64.getEncoder
 
   def main(args: Array[String]): Unit = {
     val messagingClient = MessagingClient(host = "messaging.rndmi.com")
@@ -74,14 +72,14 @@ object MessagingClient {
     new MessagingClient(channel, blockingStub, asyncStub)
   }
 
-  def encodeJsonAsByteString(jsonString: String): ByteString = {
-    val b64String = encoder.encodeToString(jsonString.getBytes(StandardCharsets.UTF_8))
-    ByteString.copyFrom(b64String, StandardCharsets.UTF_8)
+  def encodeAsByteString(dataString: String): ByteString = {
+    val byteString = dataString.getBytes
+    ByteString.copyFrom(byteString)
   }
 
-  def decodeByteStringAsJson(byteString: ByteString): String = {
+  def decodeAsDataString(byteString: ByteString): String = {
     val messageByteString = byteString.toByteArray
-    new String(decoder.decode(messageByteString))
+    new String(messageByteString)
   }
 }
 
@@ -97,7 +95,7 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       }
 
       override def onNext(message: Message): Unit = {
-        val b64String = MessagingClient.decodeByteStringAsJson(message.content)
+        val b64String = MessagingClient.decodeAsDataString(message.content)
         println(s"Client Receive Message: $b64String")
       }
     }
@@ -116,7 +114,7 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
 
     println(s"Testing messaging")
     val msg = "{'text':'hello there!'}"
-    val byteString = MessagingClient.encodeJsonAsByteString(msg)
+    val byteString = MessagingClient.encodeAsByteString(msg)
     requestObserver.onNext(Message(
       channelId = chatChannel.id,
       userId = MessagingClient.userId,
