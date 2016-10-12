@@ -3,10 +3,12 @@ package com.rndmi.messaging
 import java.util.concurrent.TimeUnit
 
 import com.google.common.base.Charsets
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, CodedOutputStream}
 import io.bigfast.messaging.Channel.{Message, Subscription}
 import io.bigfast.messaging.MessagingGrpc._
 import io.bigfast.messaging.{Empty, MessagingGrpc}
+import io.bigfast.playerstateaction.PlayerStateAction
+import io.bigfast.playerstateaction.PlayerStateAction.{GameState, Position, Velocity}
 import io.grpc._
 import io.grpc.stub.{MetadataUtils, StreamObserver}
 
@@ -76,6 +78,10 @@ object MessagingClient {
     ByteString.copyFrom(byteString)
   }
 
+  def encodeAsByteString(dataBytes: Array[Byte]): ByteString = {
+    ByteString.copyFrom(dataBytes)
+  }
+
   def decodeAsDataString(byteString: ByteString): String = {
     val messageByteString = byteString.toByteArray
     new String(messageByteString, Charsets.ISO_8859_1)
@@ -112,18 +118,28 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
     ))
 
     println(s"Testing messaging")
-    val msg = "{'text':'hello there!'}"
-    val byteString = MessagingClient.encodeAsByteString(msg)
+    val helloMessage = "{'text':'hello there!'}"
+    val psa = PlayerStateAction(
+      channelId = "channel1",
+      userId = "user1",
+      timestamp = System.currentTimeMillis(),
+      playId = "play1",
+      playerState = Some(GameState(
+        Some(Position(0F, 1F, 2F)),
+        Some(Velocity(3F, 2F, 1F))
+      ))
+    )
+
     requestObserver.onNext(Message(
       channelId = chatChannel.id,
       userId = MessagingClient.userId,
-      content = byteString
+      content = MessagingClient.encodeAsByteString(helloMessage)
     ))
     Thread.sleep(Random.nextInt(1000) + 500)
     requestObserver.onNext(Message(
       channelId = chatChannel.id,
       userId = MessagingClient.userId,
-      content = byteString
+      content = MessagingClient.encodeAsByteString(psa.toByteArray)
     ))
     Thread.sleep(Random.nextInt(1000) + 500)
 
