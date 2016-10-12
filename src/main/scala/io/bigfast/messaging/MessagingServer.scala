@@ -98,7 +98,11 @@ class MessagingServer {
       system.actorOf(User.props(userId, mediator, responseObserver))
 
       new StreamObserver[Channel.Message] {
-        override def onError(t: Throwable): Unit = logger.warning(t.getMessage)
+        override def onError(t: Throwable): Unit = {
+          responseObserver.onError(t)
+          logger.warning(t.getMessage)
+          throw t
+        }
 
         override def onCompleted(): Unit = responseObserver.onCompleted()
 
