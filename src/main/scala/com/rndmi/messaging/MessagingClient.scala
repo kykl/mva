@@ -3,7 +3,7 @@ package com.rndmi.messaging
 import java.util.concurrent.TimeUnit
 
 import com.google.common.base.Charsets
-import com.google.protobuf.{ByteString, CodedOutputStream}
+import com.google.protobuf.ByteString
 import io.bigfast.messaging.Channel.{Message, Subscription}
 import io.bigfast.messaging.MessagingGrpc._
 import io.bigfast.messaging.{Empty, MessagingGrpc}
@@ -100,8 +100,12 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       }
 
       override def onNext(message: Message): Unit = {
-        val b64String = MessagingClient.decodeAsDataString(message.content)
-        println(s"Client Receive Message: $b64String")
+        val rawString = MessagingClient.decodeAsDataString(message.content)
+        println(s"Client Receive Message: $rawString")
+
+        val playerStateAction = PlayerStateAction.parseFrom(message.content.toByteArray)
+        println("Got this player state action")
+        println(playerStateAction.toString)
       }
     }
 
@@ -117,9 +121,28 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       MessagingClient.userId
     ))
 
-    println(s"Testing messaging")
-    val helloMessage = "{'text':'hello there!'}"
-    val psa = PlayerStateAction(
+    println(s"Testing messaging of complex data")
+
+    val stateAction1 = PlayerStateAction(
+      channelId = "channel1",
+      userId = "user1",
+      timestamp = System.currentTimeMillis(),
+      playId = "play1",
+      playerState = Some(GameState(
+        Some(Position(0F, 1F, 2F)),
+        Some(Velocity(3F, 2F, 1F))
+      ))
+    )
+    requestObserver.onNext(
+      Message(
+        channelId = chatChannel.id,
+        userId = MessagingClient.userId,
+        content = MessagingClient.encodeAsByteString(stateAction1.toByteArray)
+      )
+    )
+    Thread.sleep(Random.nextInt(1000) + 500)
+
+    val stateAction2 = PlayerStateAction(
       channelId = "channel1",
       userId = "user1",
       timestamp = System.currentTimeMillis(),
@@ -130,17 +153,13 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       ))
     )
 
-    requestObserver.onNext(Message(
-      channelId = chatChannel.id,
-      userId = MessagingClient.userId,
-      content = MessagingClient.encodeAsByteString(helloMessage)
-    ))
-    Thread.sleep(Random.nextInt(1000) + 500)
-    requestObserver.onNext(Message(
-      channelId = chatChannel.id,
-      userId = MessagingClient.userId,
-      content = MessagingClient.encodeAsByteString(psa.toByteArray)
-    ))
+    requestObserver.onNext(
+      Message(
+        channelId = chatChannel.id,
+        userId = MessagingClient.userId,
+        content = MessagingClient.encodeAsByteString(stateAction2.toByteArray)
+      )
+    )
     Thread.sleep(Random.nextInt(1000) + 500)
 
     requestObserver.onCompleted()
