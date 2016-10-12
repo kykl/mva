@@ -2,6 +2,7 @@ package com.rndmi.messaging
 
 import java.util.concurrent.TimeUnit
 
+import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
 import io.bigfast.messaging.Channel.{Message, Subscription}
 import io.bigfast.messaging.MessagingGrpc._
@@ -71,13 +72,13 @@ object MessagingClient {
   }
 
   def encodeAsByteString(dataString: String): ByteString = {
-    val byteString = dataString.getBytes("ISO-8859-1")
+    val byteString = dataString.getBytes(Charsets.ISO_8859_1)
     ByteString.copyFrom(byteString)
   }
 
   def decodeAsDataString(byteString: ByteString): String = {
     val messageByteString = byteString.toByteArray
-    new String(messageByteString)
+    new String(messageByteString, Charsets.ISO_8859_1)
   }
 }
 
