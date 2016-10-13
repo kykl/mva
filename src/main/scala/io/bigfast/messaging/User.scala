@@ -1,8 +1,9 @@
 package io.bigfast.messaging
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.cluster.pubsub.DistributedPubSubMediator.{Subscribe, SubscribeAck, Unsubscribe}
+import akka.cluster.pubsub.DistributedPubSubMediator.{Subscribe, SubscribeAck, Unsubscribe, UnsubscribeAck}
 import io.bigfast.messaging.Channel.Message
+import io.bigfast.messaging.Channel.Subscription.{Add, Remove}
 import io.grpc.stub.StreamObserver
 
 /*
@@ -17,17 +18,28 @@ object User {
 }
 
 class User(name: String, mediator: ActorRef, streamObserver: StreamObserver[Message]) extends Actor with ActorLogging {
-  mediator ! Subscribe(User.adminTopic(name), self)
+  override def postStop(): Unit = {
+    log.info(s"Actor for user $name shutting down!")
+    super.postStop()
+  }
+
+  override def preStart(): Unit = {
+    log.info(s"Actor for user $name booting up - subscribing to admin topic")
+    mediator ! Subscribe(User.adminTopic(name), self)
+    super.preStart()
+  }
 
   def receive = {
-    case message: Message =>
+    case message: Message                    =>
       log.info(message.toString)
       streamObserver.onNext(message)
-    case subscriptionAdd: Channel.Subscription.Add =>
+    case subscriptionAdd: Add                =>
       mediator ! Subscribe(subscriptionAdd.channelId, self)
-    case subscriptionRemove: Channel.Subscription.Remove =>
+    case subscriptionRemove: Remove          =>
       mediator ! Unsubscribe(subscriptionRemove.channelId, self)
-    case subscriptionAdded: SubscribeAck =>
+    case subscriptionAdded: SubscribeAck     =>
       log.info(s"Successfully subscribed $name to ${subscriptionAdded.subscribe.topic}")
+    case subscriptionRemoved: UnsubscribeAck =>
+      log.info(s"Successfully unsubscribed $name from ${subscriptionRemoved.unsubscribe.topic}")
   }
 }
