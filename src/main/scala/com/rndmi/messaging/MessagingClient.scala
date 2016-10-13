@@ -120,6 +120,8 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       chatChannel.id,
       MessagingClient.userId
     ))
+    Thread.sleep(Random.nextInt(1000) + 500)
+
 
     println(s"Testing messaging of complex data")
 
@@ -129,8 +131,8 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       timestamp = System.currentTimeMillis(),
       playId = "play1",
       playerState = Some(GameState(
-        Some(Position(0F, 1F, 2F)),
-        Some(Velocity(3F, 2F, 1F))
+        Some(Position(3F, 1F, 2F)),
+        Some(Velocity(1F, 3F, 1F))
       ))
     )
     requestObserver.onNext(
@@ -146,7 +148,7 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       channelId = "channel1",
       userId = "user1",
       timestamp = System.currentTimeMillis(),
-      playId = "play1",
+      playId = "play2",
       playerState = Some(GameState(
         Some(Position(0F, 1F, 2F)),
         Some(Velocity(3F, 2F, 1F))
