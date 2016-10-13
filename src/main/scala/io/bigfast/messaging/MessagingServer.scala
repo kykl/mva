@@ -15,7 +15,8 @@ import io.bigfast.messaging.auth.{AuthService, HeaderServerInterceptor}
 import io.grpc._
 import io.grpc.stub.StreamObserver
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 
 /**
@@ -93,7 +94,7 @@ class MessagingServer {
   private class ChatImpl extends MessagingGrpc.Messaging {
 
     override def channelMessageStream(responseObserver: StreamObserver[Message]): StreamObserver[Message] = {
-      val userId: String = HeaderServerInterceptor.userIdKey.get()
+      val userId: String = Await.result(HeaderServerInterceptor.userIdKey.get(), 2.seconds)
       logger.info(s"Creating stream for userId: $userId")
       val userActor = system.actorOf(User.props(userId, mediator, responseObserver))
 
@@ -135,12 +136,13 @@ class MessagingServer {
       }
 
     private def eventualPrivilegeCheck[A, B](request: A)(process: A => B) = {
-      if (HeaderServerInterceptor.privilegedKey.get()) {
-        Future {
-          process(request)
-        }
-      } else {
-        Future.failed(new Exception("Not Privileged"))
+      HeaderServerInterceptor.privilegedKey.get() map { privileged =>
+        if (privileged) process(request)
+        else throw new Exception("Not Privileged")
+      } recover {
+        case e =>
+          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
+          throw e
       }
     }
 
