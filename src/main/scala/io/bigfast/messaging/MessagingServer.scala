@@ -4,7 +4,7 @@ import java.io.File
 import java.util.UUID
 import java.util.logging.Logger
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, PoisonPill}
 import akka.cluster.Cluster
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Publish
@@ -95,19 +95,24 @@ class MessagingServer {
     override def channelMessageStream(responseObserver: StreamObserver[Message]): StreamObserver[Message] = {
       val userId: String = HeaderServerInterceptor.userIdKey.get()
       logger.info(s"Creating stream for userId: $userId")
-      system.actorOf(User.props(userId, mediator, responseObserver))
+      val userActor = system.actorOf(User.props(userId, mediator, responseObserver))
 
       new StreamObserver[Channel.Message] {
         override def onError(t: Throwable): Unit = {
           responseObserver.onError(t)
-          logger.warning(t.getMessage)
+          logger.warning(s"channelMessageStream.onError(${t.getMessage}) for user $userId")
+          userActor ! PoisonPill
           throw t
         }
 
-        override def onCompleted(): Unit = responseObserver.onCompleted()
+        override def onCompleted(): Unit = {
+          logger.info(s"Shutting down channelMessageStream for $userId")
+          userActor ! PoisonPill
+          responseObserver.onCompleted()
+        }
 
         override def onNext(message: Message): Unit = {
-          logger.info(s"Server Got Message on channel ${message.channelId} for user ${message.userId} with content: ${message.content.toStringUtf8}")
+          logger.info(s"Server Got Message on channel ${message.channelId} from user ${message.userId} with content: ${message.content.toStringUtf8}")
           mediator ! Publish(message.channelId.toString, message)
         }
       }
@@ -121,6 +126,14 @@ class MessagingServer {
         channel
       }
 
+    override def subscribeChannel(request: Add): Future[Empty] =
+      eventualPrivilegeCheck(request) { request =>
+        logger.info(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
+        val adminTopic = User.adminTopic(request.userId.toString)
+        mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
+        Empty.defaultInstance
+      }
+
     private def eventualPrivilegeCheck[A, B](request: A)(process: A => B) = {
       if (HeaderServerInterceptor.privilegedKey.get()) {
         Future {
@@ -130,14 +143,6 @@ class MessagingServer {
         Future.failed(new Exception("Not Privileged"))
       }
     }
-
-    override def subscribeChannel(request: Add): Future[Empty] =
-      eventualPrivilegeCheck(request) { request =>
-        logger.info(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
-        val adminTopic = User.adminTopic(request.userId.toString)
-        mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
-        Empty.defaultInstance
-      }
 
     override def unsubscribeChannel(request: Remove): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
