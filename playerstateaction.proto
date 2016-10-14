@@ -36,12 +36,11 @@ message PlayerStateAction {
         }
     }
 
-    string channelId = 1;
-    string userId = 2;
-    string playId = 3;
-    uint64 timestamp = 4;
-    GameState playerState = 5;
+    string playId = 1;
+    string matchId = 2;
+    uint64 timestamp = 3;
+    GameState playerState = 4;
+    Action playerAction = 5;
     repeated GameState teamState = 6;
     repeated GameState opponentState = 7;
-    Action playerAction = 8;
 }
