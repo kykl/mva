@@ -48,7 +48,7 @@ object MessagingClient {
     val channel = builder.build()
 
     // Set up metadata from hidden auth file
-    val authLines = Source.fromFile("client-auth.pem").getLines()
+    val authLines = Source.fromFile(s"client-auth-$userId.pem").getLines()
     val authorization = authLines.next()
     val session = authLines.next()
     val metadata = new Metadata()
