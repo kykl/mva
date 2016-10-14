@@ -27,13 +27,15 @@ import scala.util.{Failure, Random, Success, Try}
 
 object MessagingClient {
   // Hardcoded from rndmi internal auth
-  val userId = "18127"
+  val userId = "18128"
+  val incomingChannel = "client2Server"
+  val outgoingChannel = "server2Client"
 
   def main(args: Array[String]): Unit = {
     val messagingClient = MessagingClient(host = "messaging.rndmi.com")
 
     Try {
-      messagingClient.connectStream
+      messagingClient.testStream()
     } match {
       case Success(_)         =>
         println("Completed test")
@@ -89,8 +91,9 @@ object MessagingClient {
 }
 
 class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
-  def connectStream: StreamObserver[Message] = {
-    val r = new StreamObserver[Message] {
+
+  val requestObserver = asyncStub.channelMessageStream(
+    new StreamObserver[Message] {
       override def onError(t: Throwable): Unit = {
         println(t)
       }
@@ -106,19 +109,30 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
         val playerStateAction = PlayerStateAction.parseFrom(message.content.toByteArray)
         println("Got this player state action")
         println(playerStateAction.toString)
+        println(s"Sending back to user ${message.userId}")
+
+        respond(message.withChannelId(MessagingClient.outgoingChannel))
       }
-    }
+    })
 
-    val requestObserver = asyncStub.channelMessageStream(r)
-
+  def testStream(): Unit = {
     println(s"Testing channel Create")
     val chatChannel = blockingStub.createChannel(Empty())
     println(s"Created channel with id ${chatChannel.id}")
 
     println(s"Subscribing to channel ${chatChannel.id}")
+    //    blockingStub.subscribeChannel(Subscription.Add(
+    //      chatChannel.id,
+    //      MessagingClient.userId
+    //    ))
+
     blockingStub.subscribeChannel(Subscription.Add(
-      chatChannel.id,
+      MessagingClient.incomingChannel,
       MessagingClient.userId
+    ))
+    blockingStub.subscribeChannel(Subscription.Add(
+      MessagingClient.outgoingChannel,
+      "18128"
     ))
     Thread.sleep(Random.nextInt(1000) + 500)
 
@@ -165,11 +179,13 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
     Thread.sleep(Random.nextInt(1000) + 500)
 
     requestObserver.onCompleted()
-
-    r
   }
 
   def shutdown(): Unit = {
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
+  }
+
+  private def respond(message: Message): Unit = {
+    requestObserver.onNext(message)
   }
 }
