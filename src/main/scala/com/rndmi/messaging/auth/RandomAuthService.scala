@@ -11,10 +11,6 @@ import io.bigfast.messaging.auth.AuthService
 import io.grpc.Metadata
 import spray.json.{JsonParser, ParserInput}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.util.Try
-
 /**
   * Created by andy on 9/28/16.
   */
@@ -22,33 +18,31 @@ class RandomAuthService extends AuthService {
 
   import RandomAuthService._
 
-  override def doAuth(metadata: Metadata) = Try {
+  override def doAuth(metadata: Metadata) = {
 
     val authorization = metadata.get[String](authorizationKey)
     val session = metadata.get[String](sessionKey)
 
     logger.info(s"Checking auth for $authorization, $session")
 
-    val request = http.singleRequest(
+    val httpResponse = http.singleRequest(
       HttpRequest(
         uri = "https://dev-api.rndmi.com:443/v1/profiles/me?fields=userId"
       ).withHeaders(
         AuthorizationHeader(authorization),
         SessionHeader(session)
       )
-    )(materializer) flatMap { response =>
+    )(materializer)
+
+    httpResponse flatMap { response =>
       val responseEntity = response.entity
       val eventualRandomResponse = unmarshaller.apply(responseEntity)
 
       logger.info(s"Parsed this response: $eventualRandomResponse")
       eventualRandomResponse
+    } map { resp =>
+      (resp.data.userId.toString, true)
     }
-
-    val awaitedResponse = Await.result(request, 5.seconds)
-
-    logger.info(s"Awaited and got $awaitedResponse")
-
-    (awaitedResponse.data.userId.toString, true)
   }
 }
 

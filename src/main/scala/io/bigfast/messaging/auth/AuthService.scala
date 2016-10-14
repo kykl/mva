@@ -2,7 +2,7 @@ package io.bigfast.messaging.auth
 
 import io.grpc.Metadata
 
-import scala.util.Try
+import scala.concurrent.Future
 
 /**
   * AuthService
@@ -11,5 +11,5 @@ import scala.util.Try
   * isPrivileged: Boolean flag for whether user is admin
   */
 trait AuthService {
-  def doAuth(metadata: Metadata): Try[(String, Boolean)]
+  def doAuth(metadata: Metadata): Future[(String, Boolean)]
 }

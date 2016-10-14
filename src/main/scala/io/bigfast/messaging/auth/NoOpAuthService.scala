@@ -2,13 +2,13 @@ package io.bigfast.messaging.auth
 
 import io.grpc.Metadata
 
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by andy on 9/28/16.
   */
-class NoOpAuthService extends AuthService {
-  override def doAuth(metadata: Metadata): Try[(String, Boolean)] = Try {
+class NoOpAuthService(implicit val executionContext: ExecutionContext) extends AuthService {
+  override def doAuth(metadata: Metadata): Future[(String, Boolean)] = Future {
     val userId = metadata.get[String](NoOpAuthService.userKey)
     (userId, false)
   }
