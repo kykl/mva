@@ -30,11 +30,12 @@ object MessagingClient {
   val outgoingChannel = "server2Client"
 
   def main(args: Array[String]): Unit = {
-    val messagingClient = MessagingClient(host = "messaging.rndmi.com")
+    MessagingClient(host = "messaging.rndmi.com")
+    print(s"Running stuff")
 
     while (true) {
+      print(".")
       Thread.sleep(5000)
-      println(s"Running stuff")
     }
   }
 
@@ -90,7 +91,10 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
     MessagingClient.userId
   ))
   val requestObserver = asyncStub.channelMessageStream(
+
     new StreamObserver[Message] {
+      println(s"Creating a new bi-directional stream")
+
       override def onError(t: Throwable): Unit = {
         println(t)
         shutdown()
