@@ -5,15 +5,13 @@ import java.util.concurrent.TimeUnit
 import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
 import io.bigfast.messaging.Channel.{Message, Subscription}
+import io.bigfast.messaging.MessagingGrpc
 import io.bigfast.messaging.MessagingGrpc._
-import io.bigfast.messaging.{Empty, MessagingGrpc}
 import io.bigfast.playerstateaction.PlayerStateAction
-import io.bigfast.playerstateaction.PlayerStateAction.{GameState, Position, Velocity}
 import io.grpc._
 import io.grpc.stub.{MetadataUtils, StreamObserver}
 
 import scala.io.Source
-import scala.util.{Failure, Random, Success, Try}
 
 /**
   * MessagingClient
@@ -33,15 +31,11 @@ object MessagingClient {
 
   def main(args: Array[String]): Unit = {
     val messagingClient = MessagingClient(host = "messaging.rndmi.com")
+    messagingClient.testStream()
 
-    Try {
-      messagingClient.testStream()
-    } match {
-      case Success(_)         =>
-        println("Completed test")
-      case Failure(exception) =>
-        println(exception)
-        messagingClient.shutdown()
+    while (true) {
+      Thread.sleep(5000)
+      println(s"Running stuff")
     }
   }
 
@@ -116,69 +110,11 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
     })
 
   def testStream(): Unit = {
-    println(s"Testing channel Create")
-    val chatChannel = blockingStub.createChannel(Empty())
-    println(s"Created channel with id ${chatChannel.id}")
-
-    println(s"Subscribing to channel ${chatChannel.id}")
-    //    blockingStub.subscribeChannel(Subscription.Add(
-    //      chatChannel.id,
-    //      MessagingClient.userId
-    //    ))
-
+    println(s"Subscribing to inbound channel")
     blockingStub.subscribeChannel(Subscription.Add(
       MessagingClient.incomingChannel,
       MessagingClient.userId
     ))
-    blockingStub.subscribeChannel(Subscription.Add(
-      MessagingClient.outgoingChannel,
-      "18128"
-    ))
-    Thread.sleep(Random.nextInt(1000) + 500)
-
-
-    println(s"Testing messaging of complex data")
-
-    val stateAction1 = PlayerStateAction(
-      channelId = "channel1",
-      userId = "user1",
-      timestamp = System.currentTimeMillis(),
-      playId = "play1",
-      playerState = Some(GameState(
-        Some(Position(3F, 1F, 2F)),
-        Some(Velocity(1F, 3F, 1F))
-      ))
-    )
-    requestObserver.onNext(
-      Message(
-        channelId = chatChannel.id,
-        userId = MessagingClient.userId,
-        content = MessagingClient.encodeAsByteString(stateAction1.toByteArray)
-      )
-    )
-    Thread.sleep(Random.nextInt(1000) + 500)
-
-    val stateAction2 = PlayerStateAction(
-      channelId = "channel1",
-      userId = "user1",
-      timestamp = System.currentTimeMillis(),
-      playId = "play2",
-      playerState = Some(GameState(
-        Some(Position(0F, 1F, 2F)),
-        Some(Velocity(3F, 2F, 1F))
-      ))
-    )
-
-    requestObserver.onNext(
-      Message(
-        channelId = chatChannel.id,
-        userId = MessagingClient.userId,
-        content = MessagingClient.encodeAsByteString(stateAction2.toByteArray)
-      )
-    )
-    Thread.sleep(Random.nextInt(1000) + 500)
-
-    requestObserver.onCompleted()
   }
 
   def shutdown(): Unit = {
