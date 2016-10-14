@@ -85,11 +85,7 @@ object MessagingClient {
 }
 
 class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
-  println(s"Subscribing to inbound channel")
-  blockingStub.subscribeChannel(Subscription.Add(
-    MessagingClient.incomingChannel,
-    MessagingClient.userId
-  ))
+
   val requestObserver = asyncStub.channelMessageStream(
 
     new StreamObserver[Message] {
@@ -117,6 +113,12 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
         handleMessage(message)
       }
     })
+
+  println(s"Subscribing to inbound channel")
+  blockingStub.subscribeChannel(Subscription.Add(
+    MessagingClient.incomingChannel,
+    MessagingClient.userId
+  ))
 
   def shutdown(): Unit = {
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
