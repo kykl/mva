@@ -31,7 +31,6 @@ object MessagingClient {
 
   def main(args: Array[String]): Unit = {
     val messagingClient = MessagingClient(host = "messaging.rndmi.com")
-    messagingClient.testStream()
 
     while (true) {
       Thread.sleep(5000)
@@ -85,15 +84,21 @@ object MessagingClient {
 }
 
 class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
-
+  println(s"Subscribing to inbound channel")
+  blockingStub.subscribeChannel(Subscription.Add(
+    MessagingClient.incomingChannel,
+    MessagingClient.userId
+  ))
   val requestObserver = asyncStub.channelMessageStream(
     new StreamObserver[Message] {
       override def onError(t: Throwable): Unit = {
         println(t)
+        shutdown()
       }
 
       override def onCompleted(): Unit = {
         println("Completed Stream")
+        shutdown()
       }
 
       override def onNext(message: Message): Unit = {
@@ -105,23 +110,15 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
         println(playerStateAction.toString)
         println(s"Sending back to user ${message.userId}")
 
-        respond(message.withChannelId(MessagingClient.outgoingChannel))
+        handleMessage(message)
       }
     })
-
-  def testStream(): Unit = {
-    println(s"Subscribing to inbound channel")
-    blockingStub.subscribeChannel(Subscription.Add(
-      MessagingClient.incomingChannel,
-      MessagingClient.userId
-    ))
-  }
 
   def shutdown(): Unit = {
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
   }
 
-  private def respond(message: Message): Unit = {
-    requestObserver.onNext(message)
+  private def handleMessage(message: Message): Unit = {
+    requestObserver.onNext(message.withChannelId(MessagingClient.outgoingChannel))
   }
 }
