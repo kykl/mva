@@ -102,14 +102,6 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       }
 
       override def onNext(message: Message): Unit = {
-        val rawString = MessagingClient.decodeAsDataString(message.content)
-        println(s"Client Receive Message: $rawString")
-
-        val playerStateAction = PlayerStateAction.parseFrom(message.content.toByteArray)
-        println("Got this player state action")
-        println(playerStateAction.toString)
-        println(s"Sending back to user ${message.userId}")
-
         handleMessage(message)
       }
     })

@@ -113,7 +113,6 @@ class MessagingServer {
         }
 
         override def onNext(message: Message): Unit = {
-          logger.info(s"Server Got Message on channel ${message.channelId} from user ${message.userId} with content: ${message.content.toStringUtf8}")
           mediator ! Publish(message.channelId.toString, message)
         }
       }
