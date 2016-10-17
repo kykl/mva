@@ -25,7 +25,7 @@ import scala.io.Source
 
 object MessagingClient {
   // Hardcoded from rndmi internal auth
-  val userId = "18128"
+  val userId = "18127"
   val incomingChannel = "client2Server"
   val outgoingChannel = "server2Client"
 
