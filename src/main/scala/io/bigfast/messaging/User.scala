@@ -31,7 +31,7 @@ class User(name: String, mediator: ActorRef, streamObserver: StreamObserver[Mess
 
   def receive = {
     case message: Message                    =>
-      log.info(message.toString)
+      log.info(s"Receive message from ${message.userId} on ${message.channelId}: ${message.toString}")
       streamObserver.onNext(message)
     case subscriptionAdd: Add                =>
       mediator ! Subscribe(subscriptionAdd.channelId, self)

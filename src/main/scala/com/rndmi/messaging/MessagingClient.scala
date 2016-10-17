@@ -114,11 +114,17 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
       }
     })
 
+  Thread.sleep(3000)
+
   println(s"Subscribing to inbound channel")
   blockingStub.subscribeChannel(Subscription.Add(
     MessagingClient.incomingChannel,
     MessagingClient.userId
   ))
+
+  Thread.sleep(1000)
+
+  requestObserver.onNext(new Message(userId = "18128", channelId = "client2Server"))
 
   def shutdown(): Unit = {
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
