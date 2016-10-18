@@ -6,7 +6,7 @@ import java.util.logging.Logger
 
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.cluster.pubsub.DistributedPubSub
-import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Send}
+import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, SendToAll}
 import akka.cluster.seed.ZookeeperClusterSeed
 import com.typesafe.config.ConfigFactory
 import io.bigfast.messaging.Channel.Message
@@ -128,7 +128,7 @@ class MessagingServer {
     override def subscribeChannel(request: Add): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
         logger.info(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
-        mediator ! Send(path = s"/user/${request.userId}", msg = Add(request.channelId, request.userId), localAffinity = false)
+        mediator ! SendToAll(path = s"/user/${request.userId}", msg = request)
         Empty.defaultInstance
       }
 
@@ -146,9 +146,8 @@ class MessagingServer {
     override def unsubscribeChannel(request: Remove): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
         logger.info(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
-        mediator ! Send(path = s"/user/${request.userId}", msg = Remove(request.channelId, request.userId), localAffinity = false)
+        mediator ! SendToAll(path = s"/user/${request.userId}", msg = Remove(request.channelId, request.userId))
         Empty.defaultInstance
       }
   }
-
 }
