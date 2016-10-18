@@ -1,7 +1,7 @@
 package io.bigfast.messaging
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.cluster.pubsub.DistributedPubSubMediator.{Subscribe, SubscribeAck, Unsubscribe, UnsubscribeAck}
+import akka.cluster.pubsub.DistributedPubSubMediator._
 import io.bigfast.messaging.Channel.Message
 import io.bigfast.messaging.Channel.Subscription.{Add, Remove}
 import io.grpc.stub.StreamObserver
@@ -13,8 +13,6 @@ It has 2 auxiliary functions that allow it to subscribe and unsubscribe from a t
  */
 object User {
   def props(name: String, mediator: ActorRef, streamObserver: StreamObserver[Message]): Props = Props(classOf[User], name, mediator, streamObserver)
-
-  def adminTopic(name: String) = s"admin-$name"
 }
 
 class User(name: String, mediator: ActorRef, streamObserver: StreamObserver[Message]) extends Actor with ActorLogging {
@@ -24,8 +22,8 @@ class User(name: String, mediator: ActorRef, streamObserver: StreamObserver[Mess
   }
 
   override def preStart(): Unit = {
-    log.info(s"Actor for user $name booting up - subscribing to admin topic")
-    mediator ! Subscribe(User.adminTopic(name), self)
+    log.info(s"Actor for user $name booting up - registering with mediator")
+    mediator ! Put(self)
     super.preStart()
   }
 

@@ -6,8 +6,9 @@ import java.util.logging.Logger
 
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.cluster.Cluster
-import akka.cluster.pubsub.DistributedPubSub
-import akka.cluster.pubsub.DistributedPubSubMediator.Publish
+import akka.cluster.pubsub.{DistributedPubSub, DistributedPubSubMediator}
+import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Send}
+import akka.pattern._
 import com.typesafe.config.ConfigFactory
 import io.bigfast.messaging.Channel.Message
 import io.bigfast.messaging.Channel.Subscription.{Add, Remove}
@@ -96,7 +97,7 @@ class MessagingServer {
     override def channelMessageStream(responseObserver: StreamObserver[Message]): StreamObserver[Message] = {
       val userId: String = Await.result(HeaderServerInterceptor.userIdKey.get(), 2.seconds)
       logger.info(s"Creating stream for userId: $userId")
-      val userActor = system.actorOf(User.props(userId, mediator, responseObserver))
+      val userActor = system.actorOf(User.props(userId, mediator, responseObserver), userId)
 
       new StreamObserver[Channel.Message] {
         override def onError(t: Throwable): Unit = {
@@ -129,8 +130,7 @@ class MessagingServer {
     override def subscribeChannel(request: Add): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
         logger.info(s"Subscribe to channel ${request.channelId} for user ${request.userId}")
-        val adminTopic = User.adminTopic(request.userId.toString)
-        mediator ! Publish(adminTopic, Add(request.channelId, request.userId))
+        mediator ! Send(path = s"/user/${request.userId}", msg = Add(request.channelId, request.userId), localAffinity = false)
         Empty.defaultInstance
       }
 
@@ -148,8 +148,7 @@ class MessagingServer {
     override def unsubscribeChannel(request: Remove): Future[Empty] =
       eventualPrivilegeCheck(request) { request =>
         logger.info(s"Unsubscribe from channel ${request.channelId} for user ${request.userId}")
-        val adminTopic = User.adminTopic(request.userId.toString)
-        mediator ! Publish(adminTopic, Remove(request.channelId, request.userId))
+        mediator ! Send(path = s"/user/${request.userId}", msg = Remove(request.channelId, request.userId), localAffinity = false)
         Empty.defaultInstance
       }
   }
