@@ -113,10 +113,6 @@ class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBl
     MessagingClient.userId
   ))
 
-  Thread.sleep(1000)
-
-  requestObserver.onNext(new Message(userId = "18128", channelId = "client2Server"))
-
   def shutdown(): Unit = {
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
   }
