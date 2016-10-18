@@ -7,7 +7,6 @@ import com.google.protobuf.ByteString
 import io.bigfast.messaging.Channel.{Message, Subscription}
 import io.bigfast.messaging.MessagingGrpc
 import io.bigfast.messaging.MessagingGrpc._
-import io.bigfast.playerstateaction.PlayerStateAction
 import io.grpc._
 import io.grpc.stub.{MetadataUtils, StreamObserver}
 
