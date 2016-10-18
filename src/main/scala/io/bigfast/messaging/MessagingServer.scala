@@ -5,10 +5,9 @@ import java.util.UUID
 import java.util.logging.Logger
 
 import akka.actor.{ActorSystem, PoisonPill}
-import akka.cluster.Cluster
-import akka.cluster.pubsub.{DistributedPubSub, DistributedPubSubMediator}
+import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Send}
-import akka.pattern._
+import akka.cluster.seed.ZookeeperClusterSeed
 import com.typesafe.config.ConfigFactory
 import io.bigfast.messaging.Channel.Message
 import io.bigfast.messaging.Channel.Subscription.{Add, Remove}
@@ -31,11 +30,10 @@ object MessagingServer {
   // Start Akka Cluster
   val systemName = "DistributedMessaging"
   implicit val system = ActorSystem(systemName)
-  val joinAddress = Cluster(system).selfAddress
   val mediator = DistributedPubSub(system).mediator
   private val logger = Logger.getLogger(classOf[MessagingServer].getName)
   private val port = 8443
-  Cluster(system).join(joinAddress)
+  ZookeeperClusterSeed(system).join()
 
   def main(args: Array[String]): Unit = {
     val server = new MessagingServer

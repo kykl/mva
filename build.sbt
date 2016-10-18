@@ -3,7 +3,7 @@ import com.typesafe.sbt.packager.docker._
 lazy val root = (project in file(".")).
   settings(
     name := "messaging-cluster",
-    version := "0.32",
+    version := "0.40",
     mainClass in Compile := Some("io.bigfast.messaging.MessagingServer"),
     scalaVersion := "2.11.8"
   ).
@@ -19,6 +19,7 @@ dockerCommands := dockerCommands.value flatMap {
 lazy val akkaVersion = "2.4.11"
 
 libraryDependencies ++= Seq(
+  "com.sclasen" %% "akka-zk-cluster-seed" % "0.1.7-SNAPSHOT",
   "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
   "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
   "com.typesafe.akka" %% "akka-http-core" % akkaVersion,
