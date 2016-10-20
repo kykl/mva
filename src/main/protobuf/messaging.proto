@@ -4,34 +4,25 @@ package io.bigfast;
 
 message Empty {}
 
-message Channel {
-    message Message {
-        string id = 1;
-        string channelId = 2;
-        string userId = 3;
-        bytes content = 4;
-    }
+message Subscription {
+    string channelId = 1;
+    string userId = 2;
+}
 
-    message Subscription {
-        message Add {
-            string channelId = 1;
-            string userId = 2;
-        }
-
-        message Remove {
-            string channelId = 1;
-            string userId = 2;
-        }
-    }
-
+message UntypedMessage {
     string id = 1;
+    string channelId = 2;
+    string userId = 3;
+    bytes content = 4;
 }
 
 // The messaging service definition.
 service Messaging {
-    rpc ChannelMessageStream (stream Channel.Message) returns (stream Channel.Message) {}
-    rpc CreateChannel (Empty) returns (Channel) {}
+    rpc UntypedChannelSubscribe (Subscription) returns (stream UntypedMessage) {
+    }
+    rpc UntypedGlobalPublish (stream UntypedMessage) returns (Empty) {
+    }
 
-    rpc SubscribeChannel (Channel.Subscription.Add) returns (Empty) {}
-    rpc UnsubscribeChannel (Channel.Subscription.Remove) returns (Empty) {}
+    rpc ShutdownSubscriber (Subscription) returns (Empty) {
+    }
 }

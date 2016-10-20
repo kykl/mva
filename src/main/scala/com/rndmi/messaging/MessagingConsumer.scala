@@ -4,16 +4,15 @@ import java.util.concurrent.TimeUnit
 
 import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
-import io.bigfast.messaging.Channel.{Message, Subscription}
-import io.bigfast.messaging.MessagingGrpc
 import io.bigfast.messaging.MessagingGrpc._
+import io.bigfast.messaging._
 import io.grpc._
 import io.grpc.stub.{MetadataUtils, StreamObserver}
 
 import scala.io.Source
 
 /**
-  * MessagingClient
+  * MessagingConsumer
   * Reference Scala implementation
   * Uses netty (not realistic in Android/mobile)
   * Create channel (privileged)
@@ -22,23 +21,28 @@ import scala.io.Source
   * Send and receive the same message twice
   */
 
-object MessagingClient {
+object MessagingConsumer {
   // Hardcoded from rndmi internal auth
   val userId = "18127"
   val incomingChannel = "client2Server"
   val outgoingChannel = "server2Client"
 
   def main(args: Array[String]): Unit = {
-    MessagingClient(host = "messaging.rndmi.com")
+    val mc = MessagingConsumer(host = "messaging.rndmi.com")
     print(s"Running stuff")
 
-    while (true) {
-      print(".")
-      Thread.sleep(5000)
+    try {
+      while (true) {
+        print(".")
+        Thread.sleep(5000)
+      }
+    }
+    finally {
+      mc.shutdown()
     }
   }
 
-  def apply(host: String = "localhost", port: Int = 8443): MessagingClient = {
+  def apply(host: String = "localhost", port: Int = 8443): MessagingConsumer = {
     val builder = ManagedChannelBuilder.forAddress(host, port)
     val channel = builder.build()
 
@@ -65,7 +69,7 @@ object MessagingClient {
       MessagingGrpc.stub(channel),
       metadata
     )
-    new MessagingClient(channel, blockingStub, asyncStub)
+    new MessagingConsumer(channel, blockingStub, asyncStub)
   }
 
   def encodeAsByteString(dataString: String): ByteString = {
@@ -83,41 +87,64 @@ object MessagingClient {
   }
 }
 
-class MessagingClient private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
+class MessagingConsumer private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
 
-  val requestObserver = asyncStub.channelMessageStream(
-
-    new StreamObserver[Message] {
-      println(s"Creating a new bi-directional stream")
-
+  val responseObserver = asyncStub.untypedGlobalPublish(
+    new StreamObserver[Empty] {
+      println(s"Got publishing observer")
       override def onError(t: Throwable): Unit = {
-        println(t)
-        shutdown()
+        println(s"responseObserver.onError(${t.getMessage})")
+        throw t
       }
 
       override def onCompleted(): Unit = {
-        println("Completed Stream")
-        shutdown()
+        println(s"responseObserver.onCompleted()")
       }
 
-      override def onNext(message: Message): Unit = {
-        handleMessage(message)
+      override def onNext(value: Empty): Unit = {
+        println(s"Got Empty message for some reason")
       }
-    })
+    }
+  )
 
-  Thread.sleep(3000)
+  val requestObserver = asyncStub.untypedChannelSubscribe(
+    Subscription(
+      channelId = MessagingConsumer.incomingChannel,
+      userId = MessagingConsumer.userId
+    ),
+    new StreamObserver[UntypedMessage] {
+      println(s"Got subscribing observer")
 
-  println(s"Subscribing to inbound channel")
-  blockingStub.subscribeChannel(Subscription.Add(
-    MessagingClient.incomingChannel,
-    MessagingClient.userId
-  ))
+      override def onError(t: Throwable): Unit = {
+        println(s"requestObserver.onError(${t.getMessage})")
+        throw t
+      }
+
+      override def onCompleted(): Unit = {
+        println(s"requestObserver.onCompleted()")
+      }
+
+      override def onNext(value: UntypedMessage): Unit = {
+        println(s"Got message and will send back ${value.toString}")
+        handleMessage(value)
+      }
+    }
+  )
 
   def shutdown(): Unit = {
+    unsubscribe(Subscription(
+      channelId = MessagingConsumer.incomingChannel,
+      userId = MessagingConsumer.userId
+    ))
+    responseObserver.onCompleted()
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
   }
 
-  private def handleMessage(message: Message): Unit = {
-    requestObserver.onNext(message.withChannelId(MessagingClient.outgoingChannel))
+  def unsubscribe(subscription: Subscription) = {
+    blockingStub.shutdownSubscriber(subscription)
+  }
+
+  private def handleMessage(message: UntypedMessage): Unit = {
+    responseObserver.onNext(message.withChannelId(MessagingConsumer.outgoingChannel))
   }
 }
