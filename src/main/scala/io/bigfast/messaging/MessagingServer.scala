@@ -94,7 +94,7 @@ class MessagingServer {
     override def subscribeTopicUntyped(topic: Topic, responseObserver: StreamObserver[UntypedMessage]): Unit = {
 
       val rpcContext = Context.current().withCancellation()
-      val process = processEventualUser(topic, responseObserver) { userId =>
+      processEventualUser(topic, responseObserver) { userId =>
         println(s"Creating actor for $userId on channel ${topic.id}")
         val subscriber = system.actorOf(
           Subscriber.props(userId, topic, mediator, responseObserver, rpcContext),
@@ -111,9 +111,6 @@ class MessagingServer {
           executionContext
         )
       }
-
-      // Block here since you have to wait before killing the context
-      Await.ready(process, 2.seconds)
     }
 
     override def publishGlobalUntyped(responseObserver: StreamObserver[Empty]): StreamObserver[UntypedMessage] = {
