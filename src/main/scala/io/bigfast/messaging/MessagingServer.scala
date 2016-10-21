@@ -93,9 +93,8 @@ class MessagingServer {
 
     override def subscribeTopicUntyped(topic: Topic, responseObserver: StreamObserver[UntypedMessage]): Unit = {
 
+      val rpcContext = Context.current().withCancellation()
       val process = processEventualUser(topic, responseObserver) { userId =>
-        val rpcContext = Context.current().withCancellation()
-
         println(s"Creating actor for $userId on channel ${topic.id}")
         val subscriber = system.actorOf(
           Subscriber.props(userId, topic, mediator, responseObserver, rpcContext),
@@ -103,8 +102,7 @@ class MessagingServer {
         )
         rpcContext.addListener(
           new CancellationListener() {
-            println(s"Adding cancellation listening in case client disconnects")
-
+            println(s"Registering cancellation listener for $userId@${topic.id}")
             override def cancelled(context: Context): Unit = {
               logger.info(s"Client $userId disconnected - removing subscription to ${topic.id}")
               subscriber ! ShutdownSubscribe
