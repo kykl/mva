@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
 import io.bigfast.messaging.MessagingGrpc.{MessagingBlockingStub, MessagingStub}
-import io.bigfast.messaging.{Empty, MessagingGrpc, Subscription, UntypedMessage}
+import io.bigfast.messaging._
 import io.grpc.stub.{MetadataUtils, StreamObserver}
 import io.grpc.{ManagedChannel, ManagedChannelBuilder, Metadata}
 
@@ -17,8 +17,8 @@ import scala.io.Source
 object MessagingProducer {
   // Hardcoded from rndmi internal auth
   val userId = "18128"
-  val incomingChannel = "server2Client"
-  val outgoingChannel = "client2Server"
+  val subscribeTopic = "server2Client"
+  val publishTopic = "client2Server"
 
   def main(args: Array[String]): Unit = {
     val messagingProducer = MessagingProducer(host = "messaging.rndmi.com")
@@ -27,7 +27,7 @@ object MessagingProducer {
     try {
       while (true) {
         messagingProducer.responseObserver.onNext(
-          UntypedMessage(userId = "18128", channelId = MessagingProducer.outgoingChannel)
+          UntypedMessage(topicId = MessagingProducer.publishTopic)
         )
         Thread.sleep(1000)
       }
@@ -85,7 +85,7 @@ object MessagingProducer {
 
 class MessagingProducer private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
 
-  val responseObserver = asyncStub.untypedGlobalPublish(
+  val responseObserver = asyncStub.publishGlobalUntyped(
     new StreamObserver[Empty] {
       override def onError(t: Throwable): Unit = {
         println(s"responseObserver.onError(${t.getMessage})")
@@ -102,11 +102,8 @@ class MessagingProducer private(channel: ManagedChannel, blockingStub: Messaging
     }
   )
 
-  val requestObserver = asyncStub.untypedChannelSubscribe(
-    Subscription(
-      channelId = MessagingProducer.incomingChannel,
-      userId = MessagingProducer.userId
-    ),
+  val requestObserver = asyncStub.subscribeTopicUntyped(
+    Topic(MessagingProducer.subscribeTopic),
     new StreamObserver[UntypedMessage] {
       override def onError(t: Throwable): Unit = {
         println(s"requestObserver.onError(${t.getMessage})")

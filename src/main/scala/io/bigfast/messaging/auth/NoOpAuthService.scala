@@ -8,9 +8,8 @@ import scala.concurrent.{ExecutionContext, Future}
   * Created by andy on 9/28/16.
   */
 class NoOpAuthService(implicit val executionContext: ExecutionContext) extends AuthService {
-  override def doAuth(metadata: Metadata): Future[(String, Boolean)] = Future {
-    val userId = metadata.get[String](NoOpAuthService.userKey)
-    (userId, false)
+  override def doAuth(metadata: Metadata): Future[String] = Future {
+    metadata.get(NoOpAuthService.userKey)
   }
 }
 

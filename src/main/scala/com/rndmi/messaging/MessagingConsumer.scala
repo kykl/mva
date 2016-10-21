@@ -24,8 +24,8 @@ import scala.io.Source
 object MessagingConsumer {
   // Hardcoded from rndmi internal auth
   val userId = "18127"
-  val incomingChannel = "client2Server"
-  val outgoingChannel = "server2Client"
+  val subscribeTopic = "client2Server"
+  val publishTopic = "server2Client"
 
   def main(args: Array[String]): Unit = {
     val mc = MessagingConsumer(host = "messaging.rndmi.com")
@@ -89,7 +89,7 @@ object MessagingConsumer {
 
 class MessagingConsumer private(channel: ManagedChannel, blockingStub: MessagingBlockingStub, asyncStub: MessagingStub) {
 
-  val responseObserver = asyncStub.untypedGlobalPublish(
+  val responseObserver = asyncStub.publishGlobalUntyped(
     new StreamObserver[Empty] {
       println(s"Got publishing observer")
       override def onError(t: Throwable): Unit = {
@@ -107,11 +107,8 @@ class MessagingConsumer private(channel: ManagedChannel, blockingStub: Messaging
     }
   )
 
-  val requestObserver = asyncStub.untypedChannelSubscribe(
-    Subscription(
-      channelId = MessagingConsumer.incomingChannel,
-      userId = MessagingConsumer.userId
-    ),
+  val requestObserver = asyncStub.subscribeTopicUntyped(
+    Topic(MessagingConsumer.subscribeTopic),
     new StreamObserver[UntypedMessage] {
       println(s"Got subscribing observer")
 
@@ -132,19 +129,16 @@ class MessagingConsumer private(channel: ManagedChannel, blockingStub: Messaging
   )
 
   def shutdown(): Unit = {
-    unsubscribe(Subscription(
-      channelId = MessagingConsumer.incomingChannel,
-      userId = MessagingConsumer.userId
-    ))
+    unsubscribe(Topic(MessagingConsumer.subscribeTopic))
     responseObserver.onCompleted()
     channel.shutdown.awaitTermination(5, TimeUnit.SECONDS)
   }
 
-  def unsubscribe(subscription: Subscription) = {
-    blockingStub.shutdownSubscriber(subscription)
+  def unsubscribe(topic: Topic) = {
+    blockingStub.shutdownSubscribe(topic)
   }
 
   private def handleMessage(message: UntypedMessage): Unit = {
-    responseObserver.onNext(message.withChannelId(MessagingConsumer.outgoingChannel))
+    responseObserver.onNext(message.withTopicId(MessagingConsumer.publishTopic))
   }
 }
