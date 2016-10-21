@@ -41,7 +41,7 @@ class RandomAuthService extends AuthService {
       logger.info(s"Parsed this response: $eventualRandomResponse")
       eventualRandomResponse
     } map { resp =>
-      (resp.data.userId.toString, true)
+      resp.data.userId.toString
     }
   }
 }

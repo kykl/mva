@@ -11,22 +11,9 @@ import scala.concurrent.{ExecutionContext, Future}
 class HeaderServerInterceptor(implicit authService: AuthService, implicit val executionContext: ExecutionContext) extends ServerInterceptor {
 
   override def interceptCall[RespT, ReqT](call: ServerCall[RespT, ReqT], requestHeaders: Metadata, next: ServerCallHandler[RespT, ReqT]) = {
-    val eventualUserPrivilege =
-      for {
-        (uid: String, priv: Boolean) <- authService.doAuth(requestHeaders)
-      } yield {
-        (uid, priv)
-      }
-
-    val eventualUserId = eventualUserPrivilege map (_._1)
-    val eventualPrivilege = eventualUserPrivilege map (_._2)
-
-
-    val context = Context.current().withValues(
+    val context = Context.current().withValue(
       HeaderServerInterceptor.userIdKey,
-      eventualUserId,
-      HeaderServerInterceptor.privilegedKey,
-      eventualPrivilege
+      authService.doAuth(requestHeaders)
     )
     Contexts.interceptCall(
       context,
@@ -39,5 +26,4 @@ class HeaderServerInterceptor(implicit authService: AuthService, implicit val ex
 
 object HeaderServerInterceptor {
   val userIdKey: Key[Future[String]] = Context.key("userId")
-  val privilegedKey: Key[Future[Boolean]] = Context.key("isPrivileged")
 }

@@ -11,5 +11,5 @@ import scala.concurrent.Future
   * isPrivileged: Boolean flag for whether user is admin
   */
 trait AuthService {
-  def doAuth(metadata: Metadata): Future[(String, Boolean)]
+  def doAuth(metadata: Metadata): Future[String]
 }
