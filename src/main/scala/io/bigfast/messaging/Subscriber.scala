@@ -2,6 +2,7 @@ package io.bigfast.messaging
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.pubsub.DistributedPubSubMediator._
+import io.bigfast.messaging.Subscriber.ShutdownSubscribe
 import io.grpc.Context.CancellableContext
 import io.grpc.stub.StreamObserver
 
@@ -12,14 +13,18 @@ It has 1 auxiliary function to shut down both the stream and itself upon command
  */
 object Subscriber {
   def props(
-             subscription: Subscription,
+             userId: String,
+             topic: Topic,
              mediator: ActorRef,
              streamObserver: StreamObserver[UntypedMessage],
              rpcContext: CancellableContext
            ): Props =
-    Props(classOf[Subscriber], subscription.userId, subscription.channelId, mediator, streamObserver, rpcContext)
+    Props(classOf[Subscriber], userId, topic.id, mediator, streamObserver, rpcContext)
 
-  def path(subscription: Subscription) = s"${subscription.userId}@${subscription.channelId}"
+  def path(channelId: String, userId: String) = s"$userId@$channelId"
+
+  case object ShutdownSubscribe
+
 }
 
 class Subscriber(
@@ -35,21 +40,19 @@ class Subscriber(
 
   override def postStop(): Unit = {
     log.info(s"Actor for user $userId shutting down!")
+    if (!rpcContext.isCancelled) streamObserver.onCompleted()
     super.postStop()
   }
 
   def receive = {
     case message: UntypedMessage             =>
       streamObserver.onNext(message)
-    case subscriptionShutdown: Subscription  =>
+    case ShutdownSubscribe                   =>
       mediator ! Unsubscribe(channelId, self)
     case subscriptionAdded: SubscribeAck     =>
       log.info(s"Successfully subscribed $userId to ${subscriptionAdded.subscribe.topic}")
     case subscriptionRemoved: UnsubscribeAck =>
       log.info(s"Successfully unsubscribed $userId from ${subscriptionRemoved.unsubscribe.topic}")
-      if (rpcContext.isCancelled)
-        context.stop(self)
-      else
-        streamObserver.onCompleted()
+      context.stop(self)
   }
 }

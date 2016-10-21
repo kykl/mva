@@ -8,6 +8,7 @@ import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, SendToAll}
 import akka.cluster.seed.ZookeeperClusterSeed
 import com.typesafe.config.ConfigFactory
+import io.bigfast.messaging.Subscriber.ShutdownSubscribe
 import io.bigfast.messaging.auth.{AuthService, HeaderServerInterceptor}
 import io.grpc.Context.CancellationListener
 import io.grpc._
@@ -90,35 +91,35 @@ class MessagingServer {
 
   private class ChatImpl extends MessagingGrpc.Messaging {
 
-    override def untypedChannelSubscribe(subscription: Subscription, responseObserver: StreamObserver[UntypedMessage]): Unit = {
-      val channelId = subscription.channelId
+    override def subscribeTopicUntyped(topic: Topic, responseObserver: StreamObserver[UntypedMessage]): Unit = {
 
-      val userId = Await.result(HeaderServerInterceptor.userIdKey.get(), 2.seconds)
+      val process = processEventualUser(topic, responseObserver) { userId =>
+        val rpcContext = Context.current().withCancellation()
 
-      val rpcContext = Context.current().withCancellation()
+        println(s"Creating actor for $userId on channel ${topic.id}")
+        val subscriber = system.actorOf(
+          Subscriber.props(userId, topic, mediator, responseObserver, rpcContext),
+          Subscriber.path(topic.id, userId)
+        )
+        rpcContext.addListener(
+          new CancellationListener() {
+            println(s"Adding cancellation listening in case client disconnects")
 
-      println(s"Creating actor for $userId on channel $channelId")
-      val subscriber = system.actorOf(
-        Subscriber.props(subscription, mediator, responseObserver, rpcContext),
-        Subscriber.path(subscription)
-      )
-      rpcContext.addListener(
-        new CancellationListener() {
-          println(s"Adding cancellation listening in case client disconnects")
+            override def cancelled(context: Context): Unit = {
+              logger.info(s"Client $userId disconnected - removing subscription to ${topic.id}")
+              subscriber ! ShutdownSubscribe
+            }
+          },
+          executionContext
+        )
+      }
 
-          override def cancelled(context: Context): Unit = {
-            logger.info(s"Client $userId disconnected - removing subscription to $channelId")
-            subscriber ! subscription
-          }
-        },
-        executionContext
-      )
+      // Block here since you have to wait before killing the context
+      Await.ready(process, 2.seconds)
     }
 
-    override def untypedGlobalPublish(responseObserver: StreamObserver[Empty]): StreamObserver[UntypedMessage] = {
-      val eventualUserId = HeaderServerInterceptor.userIdKey.get()
-
-      val eventualStream = eventualUserId map { userId =>
+    override def publishGlobalUntyped(responseObserver: StreamObserver[Empty]): StreamObserver[UntypedMessage] = {
+      val eventualStream = processEventualUser(responseObserver) { userId =>
         logger.info(s"Returning publishing stream for $userId")
         new StreamObserver[UntypedMessage] {
           override def onError(t: Throwable): Unit = {
@@ -132,39 +133,43 @@ class MessagingServer {
 
           override def onNext(untypedMessage: UntypedMessage): Unit = {
             mediator ! Publish(
-              untypedMessage.channelId,
+              untypedMessage.topicId,
               UntypedMessage(
-                userId = untypedMessage.userId,
+                userId = userId,
                 content = untypedMessage.content
               )
             )
           }
         }
-      } recover {
-        case e: Throwable =>
-          logger.warning(s"untypedGlobalPublish error: ${e.getMessage}")
-          throw e
       }
 
       // Block here since you need to return the stream observer
       Await.result(eventualStream, 2.seconds)
     }
 
-    override def shutdownSubscriber(subscription: Subscription): Future[Empty] = eventualPrivilegeCheck(subscription) { subscription =>
-      mediator ! SendToAll(s"/user/${Subscriber.path(subscription)}", subscription)
-      Empty.defaultInstance
-    }
-
-    private def eventualPrivilegeCheck[A, B](request: A)(process: A => B) = {
-      HeaderServerInterceptor.privilegedKey.get() map { privileged =>
-        if (privileged) process(request)
-        else throw new Exception("Not Privileged")
-      } recover {
+    private def processEventualUser[A, B](request: A*)(process: String => B) = {
+      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
+        process(userId)
+      }
+      eventualUser onFailure {
         case e =>
           logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
           throw e
       }
+      eventualUser
     }
+
+    override def createTopic(request: Empty): Future[Topic] = {
+      processEventualUser(request) { userId =>
+        Topic(java.util.UUID.randomUUID.toString)
+      }
+    }
+
+    override def shutdownSubscribe(topic: Topic): Future[Empty] =
+      processEventualUser(topic) { userId =>
+        mediator ! SendToAll(s"/user/${Subscriber.path(topic.id, userId)}", ShutdownSubscribe)
+        Empty.defaultInstance
+      }
   }
 
 }
