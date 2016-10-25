@@ -44,10 +44,10 @@ message Action {
 message GameTimestep {
     string episodeId = 1;
     uint64 timestep = 2;
-    repeated StateActionPair = 3;
+    repeated StateActionPair playerStateAction = 3;
 }
 
 message StateActionPair {
-    GameState playerState = 4;
-    Action playerAction = 5;
+    GameState playerState = 1;
+    Action playerAction = 2;
 }
