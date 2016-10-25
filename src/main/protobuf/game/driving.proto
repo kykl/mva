@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package io.bigfast.game.driving;
+
+message Position {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message Rotation {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message Velocity {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message GameState {
+    Position position = 1;
+    Rotation rotation = 2;
+    Velocity velocity = 3;
+}
+
+message Action {
+    oneof leftAction {
+        bool up = 1;
+        bool down = 2;
+        bool left = 3;
+        bool right = 4;
+    }
+
+    oneof rightAction {
+        bool gas = 5;
+        bool brake = 6;
+        bool jump = 7;
+        bool boost = 8;
+    }
+}
+message GameTimestep {
+    string episodeId = 1;
+    uint64 timestep = 2;
+    repeated StateActionPair = 3;
+}
+
+message StateActionPair {
+    GameState playerState = 4;
+    Action playerAction = 5;
+}
