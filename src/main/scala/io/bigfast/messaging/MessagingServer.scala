@@ -41,6 +41,11 @@ object MessagingServer {
     server.blockUntilShutdown()
   }
 
+  /*
+  Set up akka cluster using kubernetes dns feature
+  Thanks to http://charithe.github.io/akka-cluster-on-kubernetes.html
+   */
+
   private def resolveConfig(actorSystemName: String, port: Int): Config = {
     val hostAddress = getHostAddress
     val seedNodes = getSeedNodes(hostAddress, port)
@@ -146,18 +151,6 @@ class MessagingServer {
       }
     }
 
-    private def processEventualUser[A, B](request: A*)(process: String => B) = {
-      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
-        process(userId)
-      }
-      eventualUser onFailure {
-        case e =>
-          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
-          throw e
-      }
-      eventualUser
-    }
-
     override def publishGlobalUntyped(responseObserver: StreamObserver[Empty]): StreamObserver[UntypedMessage] = {
       val eventualStream = processEventualUser(responseObserver) { userId =>
         logger.info(s"Returning publishing stream for $userId")
@@ -198,6 +191,18 @@ class MessagingServer {
         mediator ! SendToAll(s"/user/${Subscriber.path(topic.id, userId)}", ShutdownSubscribe)
         Empty.defaultInstance
       }
+
+    private def processEventualUser[A, B](request: A*)(process: String => B) = {
+      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
+        process(userId)
+      }
+      eventualUser onFailure {
+        case e =>
+          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
+          throw e
+      }
+      eventualUser
+    }
   }
 
 }
