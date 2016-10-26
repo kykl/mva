@@ -1,19 +1,20 @@
 package io.bigfast.messaging
 
 import java.io.File
+import java.net.{InetAddress, NetworkInterface}
 import java.util.logging.Logger
 
 import akka.actor.ActorSystem
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, SendToAll}
-import akka.cluster.seed.ZookeeperClusterSeed
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import io.bigfast.messaging.Subscriber.ShutdownSubscribe
 import io.bigfast.messaging.auth.{AuthService, HeaderServerInterceptor}
 import io.grpc.Context.CancellationListener
 import io.grpc._
 import io.grpc.stub.StreamObserver
 
+import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
@@ -28,16 +29,48 @@ object MessagingServer {
   implicit val executionContext = ExecutionContext.global
   // Start Akka Cluster
   val systemName = "DistributedMessaging"
-  implicit val system = ActorSystem(systemName)
+  val conf = resolveConfig(systemName, actorPort)
+  implicit val system = ActorSystem(systemName, conf)
   val mediator = DistributedPubSub(system).mediator
   private val logger = Logger.getLogger(classOf[MessagingServer].getName)
-  private val port = 8443
-  ZookeeperClusterSeed(system).join()
+  private val serverPort = 8443
+  private val actorPort = 2600
 
   def main(args: Array[String]): Unit = {
     val server = new MessagingServer
     server.start()
     server.blockUntilShutdown()
+  }
+
+  private def resolveConfig(actorSystemName: String, port: Int): Config = {
+    val hostAddress = getHostAddress
+    val seedNodes = getSeedNodes(hostAddress, port)
+
+    ConfigFactory.empty()
+      .withValue("akka.cluster.seed-nodes", ConfigValueFactory.fromIterable(seedNodes.map(node => s"akka.tcp://$actorSystemName@$node")))
+      .withValue("akka.remote.netty.tcp.hostname", ConfigValueFactory.fromAnyRef(hostAddress))
+      .withValue("akka.remote.netty.tcp.port", ConfigValueFactory.fromAnyRef(port))
+      .withFallback(ConfigFactory.load())
+      .resolve()
+  }
+
+  private def getSeedNodes(hostAddress: String, port: Int): Seq[String] = {
+    // try to resolve the list of IP addresses from the discovery service or return local address
+    val seedNodes = Option(System.getenv("DISCOVERY_SERVICE")).fold(Seq.empty[String])(InetAddress.getAllByName(_).toSeq.map(addr => s"${addr.getHostAddress}:$port"))
+    if (seedNodes.isEmpty) {
+      Seq(s"$hostAddress:$port")
+    } else {
+      seedNodes
+    }
+  }
+
+  private def getHostAddress: String = {
+    NetworkInterface.getNetworkInterfaces
+      .find(_.getName equals "eth0")
+      .flatMap { interface =>
+        interface.getInetAddresses.find(_.isSiteLocalAddress).map(_.getHostAddress)
+      }
+      .getOrElse("127.0.0.1")
   }
 }
 
@@ -56,7 +89,7 @@ class MessagingServer {
     val certFile = new File("/etc/secrets/cert-chain")
     val privateKey = new File("/etc/secrets/private-key")
     server = ServerBuilder
-      .forPort(MessagingServer.port)
+      .forPort(MessagingServer.serverPort)
       .useTransportSecurity(certFile, privateKey)
       .addService(
         ServerInterceptors.intercept(
@@ -67,7 +100,7 @@ class MessagingServer {
       .build
       .start
 
-    logger.info("Server started, listening on " + MessagingServer.port)
+    logger.info("Server started, listening on " + MessagingServer.serverPort)
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run(): Unit = {
         logger.info("*** shutting down gRPC server since JVM is shutting down")
@@ -103,6 +136,7 @@ class MessagingServer {
         rpcContext.addListener(
           new CancellationListener() {
             println(s"Registering cancellation listener for $userId@${topic.id}")
+
             override def cancelled(context: Context): Unit = {
               logger.info(s"Client $userId disconnected - removing subscription to ${topic.id}")
               subscriber ! ShutdownSubscribe
@@ -111,6 +145,18 @@ class MessagingServer {
           executionContext
         )
       }
+    }
+
+    private def processEventualUser[A, B](request: A*)(process: String => B) = {
+      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
+        process(userId)
+      }
+      eventualUser onFailure {
+        case e =>
+          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
+          throw e
+      }
+      eventualUser
     }
 
     override def publishGlobalUntyped(responseObserver: StreamObserver[Empty]): StreamObserver[UntypedMessage] = {
@@ -140,18 +186,6 @@ class MessagingServer {
 
       // Block here since you need to return the stream observer
       Await.result(eventualStream, 2.seconds)
-    }
-
-    private def processEventualUser[A, B](request: A*)(process: String => B) = {
-      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
-        process(userId)
-      }
-      eventualUser onFailure {
-        case e =>
-          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
-          throw e
-      }
-      eventualUser
     }
 
     override def createTopic(request: Empty): Future[Topic] = {

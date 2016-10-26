@@ -19,7 +19,6 @@ dockerCommands := dockerCommands.value flatMap {
 lazy val akkaVersion = "2.4.11"
 
 libraryDependencies ++= Seq(
-  "com.sclasen" %% "akka-zk-cluster-seed" % "0.1.7-SNAPSHOT",
   "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
   "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
   "com.typesafe.akka" %% "akka-http-core" % akkaVersion,
