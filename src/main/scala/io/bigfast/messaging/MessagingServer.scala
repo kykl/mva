@@ -29,12 +29,11 @@ object MessagingServer {
   implicit val executionContext = ExecutionContext.global
   // Start Akka Cluster
   val systemName = "DistributedMessaging"
-  val conf = resolveConfig(systemName, actorPort)
+  val conf = resolveConfig(systemName, 2600)
   implicit val system = ActorSystem(systemName, conf)
   val mediator = DistributedPubSub(system).mediator
   private val logger = Logger.getLogger(classOf[MessagingServer].getName)
-  private val serverPort = 8443
-  private val actorPort = 2600
+  private val port = 8443
 
   def main(args: Array[String]): Unit = {
     val server = new MessagingServer
@@ -89,7 +88,7 @@ class MessagingServer {
     val certFile = new File("/etc/secrets/cert-chain")
     val privateKey = new File("/etc/secrets/private-key")
     server = ServerBuilder
-      .forPort(MessagingServer.serverPort)
+      .forPort(MessagingServer.port)
       .useTransportSecurity(certFile, privateKey)
       .addService(
         ServerInterceptors.intercept(
@@ -100,7 +99,7 @@ class MessagingServer {
       .build
       .start
 
-    logger.info("Server started, listening on " + MessagingServer.serverPort)
+    logger.info("Server started, listening on " + MessagingServer.port)
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run(): Unit = {
         logger.info("*** shutting down gRPC server since JVM is shutting down")
