@@ -22,7 +22,6 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 /**
   * MessagingServer
   * Allowed injection of authentication mechanism
-  * 2 types of endpoints - user and privileged
   */
 
 object MessagingServer {
