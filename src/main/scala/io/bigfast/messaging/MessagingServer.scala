@@ -5,6 +5,7 @@ import java.net.{InetAddress, NetworkInterface}
 import java.util.logging.Logger
 
 import akka.actor.ActorSystem
+import akka.cluster.Cluster
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, SendToAll}
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
@@ -31,6 +32,7 @@ object MessagingServer {
   val conf = resolveConfig(systemName, 2600)
   implicit val system = ActorSystem(systemName, conf)
   val mediator = DistributedPubSub(system).mediator
+  val cluster = Cluster.get(system)
   private val logger = Logger.getLogger(classOf[MessagingServer].getName)
   private val port = 8443
 
@@ -38,6 +40,7 @@ object MessagingServer {
     val server = new MessagingServer
     server.start()
     server.blockUntilShutdown()
+
   }
 
   /*
@@ -108,6 +111,8 @@ class MessagingServer {
       override def run(): Unit = {
         logger.info("*** shutting down gRPC server since JVM is shutting down")
         self.stop()
+        logger.info("*** leaving akka cluster since jvm is shutting down")
+        cluster.leave(cluster.selfAddress)
         logger.info("*** server shut down")
       }
     })
@@ -150,6 +155,18 @@ class MessagingServer {
       }
     }
 
+    private def processEventualUser[A, B](request: A*)(process: String => B) = {
+      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
+        process(userId)
+      }
+      eventualUser onFailure {
+        case e =>
+          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
+          throw e
+      }
+      eventualUser
+    }
+
     override def publishGlobalUntyped(responseObserver: StreamObserver[Empty]): StreamObserver[UntypedMessage] = {
       val eventualStream = processEventualUser(responseObserver) { userId =>
         logger.info(s"Returning publishing stream for $userId")
@@ -190,18 +207,6 @@ class MessagingServer {
         mediator ! SendToAll(s"/user/${Subscriber.path(topic.id, userId)}", ShutdownSubscribe)
         Empty.defaultInstance
       }
-
-    private def processEventualUser[A, B](request: A*)(process: String => B) = {
-      val eventualUser = HeaderServerInterceptor.userIdKey.get() map { userId =>
-        process(userId)
-      }
-      eventualUser onFailure {
-        case e =>
-          logger.warning(s"HeaderServerInterceptor hit error ${e.printStackTrace()}")
-          throw e
-      }
-      eventualUser
-    }
   }
 
 }
