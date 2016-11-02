@@ -113,6 +113,10 @@ class MessagingServer {
         self.stop()
         logger.info("*** leaving akka cluster since jvm is shutting down")
         cluster.leave(cluster.selfAddress)
+        cluster.down(cluster.selfAddress)
+        cluster.registerOnMemberRemoved {
+          system.terminate()
+        }
         logger.info("*** server shut down")
       }
     })
