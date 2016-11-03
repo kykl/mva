@@ -28,7 +28,7 @@ object MessagingConsumer {
   val publishTopic = "server2Client"
 
   def main(args: Array[String]): Unit = {
-    val mc = MessagingConsumer(host = "messaging.rndmi.com")
+    val mc = MessagingConsumer(host = args(0))
     print(s"Running stuff")
 
     try {
