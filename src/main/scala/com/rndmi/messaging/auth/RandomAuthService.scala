@@ -6,6 +6,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.stream.ActorMaterializer
+import com.typesafe.config.ConfigFactory
 import io.bigfast.messaging.MessagingServer._
 import io.bigfast.messaging.auth.AuthService
 import io.grpc.Metadata
@@ -26,9 +27,7 @@ class RandomAuthService extends AuthService {
     logger.info(s"Checking auth for $authorization, $session")
 
     val httpResponse = http.singleRequest(
-      HttpRequest(
-        uri = "https://dev-api.rndmi.com:443/v1/profiles/me?fields=userId"
-      ).withHeaders(
+      HttpRequest(uri = uri).withHeaders(
         AuthorizationHeader(authorization),
         SessionHeader(session)
       )
@@ -50,6 +49,7 @@ object RandomAuthService extends JsonSupport {
   val authorizationKey = Metadata.Key.of("AUTHORIZATION", Metadata.ASCII_STRING_MARSHALLER)
   val sessionKey = Metadata.Key.of("X-AUTHENTICATION", Metadata.ASCII_STRING_MARSHALLER)
   val http = Http()
+  val uri = ConfigFactory.load().getString("auth.uri")
   implicit val materializer = ActorMaterializer()
 
   val logger = Logger.getLogger(this.getClass.getName)
