@@ -21,6 +21,13 @@ The folder containing `.proto` files is a `git subtree` of a separate repo (here
  
 `git subtree pull --prefix=src/main/protobuf git@github.com:ZhangBanger/proto.git master`
 
+# Development
+
+## AuthService
+
+Create your own `AuthService` that implements `doAuth()` and returns a `Future[String]`.
+ 
+The current working example calls an HTTP endpoint using the `akka-http` library, extracts a string entry from the JSON response, and asychronously populates that value. The endpoint is defined in `application.conf` under the `auth.uri`. The implementation is loaded at runtime by defining `auth.service`.
 
 # Troubleshooting
 
