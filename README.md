@@ -1,3 +1,13 @@
+# Minimum Viable Architecture (MVA)
+
+An Akka messaging and GRPC based implementation of a minimum viable architecture that's secured, horizontally scalable and highly available for low latency messaging. 
+
+## Use Cases
+
+* Multiplayer gaming
+* Realtime communications i.e chat and messaging
+* Backend for building reactive applications
+
 # Usage Notes
 
 ## SSL Setup
